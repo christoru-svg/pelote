@@ -11,3 +11,6 @@ export const firebaseConfig = {
 };
 
 export const isConfigured = !firebaseConfig.projectId.startsWith('A-REMPLIR');
+
+/** Passe à true une fois Firebase Storage activé (forfait Blaze) pour les images de la Boîte. */
+export const IMAGES_ENABLED = false;

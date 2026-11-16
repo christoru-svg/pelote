@@ -170,8 +170,31 @@ export type ParsedThought = {
   marks: Mark[];
 };
 
-const ACTION =
-  /(?<![\p{L}])(appeler|rappeler|t[ée]l[ée]phoner\s+[àa]|[ée]crire\s+(?:[àa]|au|aux)|envoyer|relancer|r[ée]pondre\s+(?:[àa]|au|aux)|prendre\s+(?:un\s+)?(?:rdv|rendez-vous)|r[ée]server|payer|commander|acheter|penser\s+[àa]\s+(?:appeler|envoyer|écrire))(?![\p{L}])/giu;
+// Verbes d'action : l'infinitif seul (« appeler Léa »), ou conjugué après je / j' / tu
+// (« il faut que j'appelle Léa », « je relance Marc »). Le libellé repasse à l'infinitif.
+const VERBS: Array<[string, string, string]> = [
+  // [infinitif affiché, infinitif reconnu, formes conjuguées]
+  ['Appeler', 'appeler', 'appelle|appelles'],
+  ['Rappeler', 'rappeler', 'rappelle|rappelles'],
+  ['Téléphoner à', 't[ée]l[ée]phoner\\s+[àa]', 't[ée]l[ée]phones?\\s+[àa]'],
+  ['Écrire à', '[ée]crire\\s+(?:[àa]|au|aux)', '[ée]cris\\s+(?:[àa]|au|aux)'],
+  ['Envoyer', 'envoyer', 'envoies?'],
+  ['Relancer', 'relancer', 'relances?'],
+  ['Répondre à', 'r[ée]pondre\\s+(?:[àa]|au|aux)', 'r[ée]ponds\\s+(?:[àa]|au|aux)'],
+  ['Prendre rendez-vous', 'prendre\\s+(?:un\\s+)?(?:rdv|rendez-vous)', 'prends\\s+(?:un\\s+)?(?:rdv|rendez-vous)'],
+  ['Réserver', 'r[ée]server', 'r[ée]serves?'],
+  ['Payer', 'payer', 'paie|paies|paye|payes'],
+  ['Commander', 'commander', 'commandes?'],
+  ['Acheter', 'acheter', 'ach[eè]tes?'],
+];
+const INF = VERBS.map((v) => v[1]).join('|');
+const CONJ = VERBS.map((v) => v[2]).join('|');
+const ACTION = new RegExp(
+  `(?<![\\p{L}])(?:(?:penser\\s+[àa]\\s+|ne\\s+pas\\s+oublier\\s+d['’]\\s*)?(${INF})|(?:j['’]\\s*|je\\s+|tu\\s+)(${CONJ}))(?![\\p{L}])`,
+  'giu',
+);
+const infinitiveOf = (verb: string) =>
+  VERBS.find(([, inf, conj]) => new RegExp(`^(?:${inf}|${conj})$`, 'iu').test(verb.trim()))?.[0] ?? verb;
 const STOP = /[.,;!?\n]|\s(?:pour|et|avant|car|parce|puis|mais|sinon|d'ici)\s/iu;
 
 export function parseThought(text: string, ref: Date): ParsedThought {
@@ -186,14 +209,41 @@ export function parseThought(text: string, ref: Date): ParsedThought {
     const rest = text.slice(start);
     const stop = rest.slice(m[0].length).search(STOP);
     const end = start + m[0].length + (stop === -1 ? rest.length - m[0].length : stop);
-    let label = text.slice(start, end).trim().replace(/^penser\s+[àa]\s+/iu, '');
-    label = label[0].toUpperCase() + label.slice(1);
+    const verb = m[1] ?? m[2];
+    const verbAt = start + m[0].length - verb.length;
+    const label = (infinitiveOf(verb) + ' ' + text.slice(verbAt + verb.length, end)).replace(/\s+/g, ' ').trim();
     marks.push({ start, end, kind: 'action' });
     // une date dans la même phrase, après le verbe
     const sentenceEnd = (() => { const i = text.slice(start).search(/[.!?\n]/); return i === -1 ? text.length : start + i; })();
     const d = dates.find((h) => h.start >= start && h.start <= sentenceEnd);
     const t = times.find((h) => h.start >= start && h.start <= sentenceEnd);
     actions.push({ label, due_date: d ? ymd(d.date) : null, due_time: t?.time ?? null });
+  }
+  // « il faut que je… », « je dois… », « penser à… » : une obligation, même sans verbe connu.
+  if (!actions.length) {
+    const CUE = /(?<![\p{L}])(?:(?:il\s+)?fau(?:t|dra|drait)\s+(?:que\s+(?:je\s+|j['’]\s*)|qu['’]\s*(?:je\s+|j['’]\s*))|je\s+(?:dois|devrais|devrai)\s+|(?:ne\s+pas\s+oublier|n['’]oublie\s+pas)\s+(?:de\s+|d['’]\s*)|(?:penser|pense)\s+[àa]\s+)/iu;
+    const m = CUE.exec(text);
+    if (m) {
+      const startRest = m.index + m[0].length;
+      const stop = text.slice(startRest).search(STOP);
+      let rest = text.slice(startRest, stop === -1 ? text.length : startRest + stop).trim();
+      rest = rest.replace(/^(?:penser|pense)\s+[àa]\s+/iu, '').replace(/^(?:ne\s+pas\s+oublier|n['’]oublie\s+pas)\s+(?:de\s+|d['’]\s*)/iu, '');
+      if (rest.length > 2) {
+        const end = startRest + (stop === -1 ? text.length - startRest : stop);
+        marks.push({ start: m.index, end, kind: 'action' });
+        const d = dates[0];
+        actions.push({ label: rest[0].toUpperCase() + rest.slice(1), due_date: d ? ymd(d.date) : null, due_time: times[0]?.time ?? null });
+      }
+    }
+  }
+  // Une date sans verbe d'action (« dîner chez Lola samedi ») mérite quand même un rappel.
+  if (!actions.length && dates.length) {
+    const d = dates[0];
+    const from = Math.max(0, text.lastIndexOf('.', d.start) + 1);
+    const toDot = text.slice(d.end).search(/[.!?\n]/);
+    const sentence = text.slice(from, toDot === -1 ? text.length : d.end + toDot).trim();
+    const label = sentence.length > 80 ? sentence.slice(0, 79) + '…' : sentence;
+    actions.push({ label: label[0].toUpperCase() + label.slice(1), due_date: ymd(d.date), due_time: times[0]?.time ?? null });
   }
   dates.forEach((d) => marks.push({ start: d.start, end: d.end, kind: 'date' }));
   times.forEach((t) => marks.push({ start: t.start, end: t.end, kind: 'time' }));

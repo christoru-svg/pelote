@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { api, type PanierItem, type Task } from '../api';
+import { api, type PanierItem, type Reminder, type Task } from '../api';
 import { ENERGIES, EnergyBars, Face, MOODS } from '../components/Cat';
 import { Dialog } from '../components/Dialog';
 import { Highlight } from '../components/Highlight';
@@ -24,8 +24,10 @@ export function Today() {
   const [loadError, setLoadError] = useState(false);
   const [quick, setQuick] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
+  const [unfolded, setUnfolded] = useState<Set<string>>(new Set());
   const [noeudFor, setNoeudFor] = useState<{ task?: Task } | null>(null);
   const [panier, setPanier] = useState<PanierItem[]>([]);
+  const [tonight, setTonight] = useState<Reminder[]>([]);
   const [, tick] = useState(0);
   const pendingDeletes = useRef(new Map<string, number>());
   const loc = useLocation();
@@ -41,6 +43,7 @@ export function Today() {
 
   useEffect(() => { load(); }, [load, version]);
   useEffect(() => { api.panier().then((p) => setPanier(p.slice(0, 3))).catch(() => {}); }, [version]);
+  useEffect(() => { api.reminders(ymd(today())).then(setTonight).catch(() => {}); }, [version]);
   useEffect(() => { const t = setInterval(() => tick((n) => n + 1), 60000); return () => clearInterval(t); }, []);
   useEffect(() => {
     if (new URLSearchParams(loc.search).get('noeud') && fil) { setNoeudFor({}); nav('/', { replace: true }); }
@@ -131,6 +134,23 @@ export function Today() {
         },
       },
     });
+  }
+
+  /** Une tâche qui n'en est pas une repart dans la Boîte (en note ou à explorer). */
+  async function backToBoite(t: Task, to: 'note' | 'explorer') {
+    setEditing(null);
+    setTasks((xs) => xs.filter((x) => x.id !== t.id));
+    try {
+      if (to === 'note') await api.addThought({ text: t.title, ideas: [], reminders: [] });
+      else await api.addPanier({ title: t.title, body: null, url: null, tag: t.tag, context: 'depuis Aujourd’hui' });
+      await api.deleteTask(t.id);
+      if (fil?.task_id === t.id) { await api.clearFil().catch(() => {}); setFil(null); }
+    } catch {
+      setTasks((xs) => [...xs, t]);
+      fail('Ce n’a pas été déplacé');
+      return;
+    }
+    notify(to === 'note' ? 'Remis en note' : 'Rangé dans À explorer', 'C’est dans la Boîte.');
   }
 
   async function save(t: Task, patch: Partial<Task>) {
@@ -245,6 +265,17 @@ export function Today() {
         )}
       </section>
 
+      {tonight.length > 0 && (
+        <Link to="/bilan" className="banner" style={{ background: 'var(--blanc)', border: '1.5px solid var(--trait)', textDecoration: 'none', padding: '10px 14px' }}>
+          <Icon name="lune" size={18} />
+          <span className="spacer small" style={{ minWidth: 0 }}>
+            <strong>{tonight.length} rappel{tonight.length > 1 ? 's' : ''} ce soir</strong>
+            <span className="muted"> · {tonight.slice(0, 3).map((r) => r.label).join(', ')}{tonight.length > 3 ? '…' : ''}</span>
+          </span>
+          <Icon name="chevron" size={16} />
+        </Link>
+      )}
+
       <div className="cols">
         <div className="col-main">
           {fil && (
@@ -283,24 +314,35 @@ export function Today() {
             const list = groups[h.id];
             if (!list.length) return null;
             const done = list.filter((t) => t.done).length;
+            // Moins de choses sous les yeux : seul le premier horizon non vide est déplié.
+            const firstOpen = HORIZONS.find((x) => groups[x.id].length)?.id;
+            const isOpen = h.id === firstOpen || unfolded.has(h.id);
+            const toggleH = () => setUnfolded((u) => { const n = new Set(u); if (n.has(h.id)) n.delete(h.id); else n.add(h.id); return n; });
             return (
-              <section key={h.id} className="card" aria-labelledby={`h-${h.id}`}>
+              <section key={h.id} className="card" aria-labelledby={`h-${h.id}`} style={isOpen ? undefined : { padding: '12px 18px' }}>
                 <div className="row wrap">
                   <span className="dot" style={{ background: h.color }} aria-hidden="true" />
-                  <h2 id={`h-${h.id}`}>{h.name}</h2>
+                  {h.id === firstOpen
+                    ? <h2 id={`h-${h.id}`}>{h.name}</h2>
+                    : <h2 id={`h-${h.id}`} style={{ fontSize: isOpen ? 21 : 17 }}>
+                        <button type="button" onClick={toggleH} aria-expanded={isOpen} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 32, color: 'inherit' }}>
+                          {h.name}
+                          <span aria-hidden="true" style={{ display: 'inline-flex', transform: isOpen ? 'rotate(90deg)' : 'none' }}><Icon name="chevron" size={14} /></span>
+                        </button>
+                      </h2>}
                   <span className="muted small">{list.length - done} à faire{done ? ` · ${done} bouclé${done > 1 ? 's' : ''}` : ''}</span>
                   <span className="spacer" />
                   {h.id === 'today' && sieste && <span className="pilou">mode Sieste : petits morceaux d’abord</span>}
                   {h.id === 'today' && !sieste && done > 0 && <span className="pilou">déjà {done}, bien joué</span>}
                 </div>
-                {h.id === 'today' && list.length > 0 && (
+                {isOpen && h.id === 'today' && list.length > 0 && (
                   <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={list.length} aria-valuenow={done} aria-label="Avancement du jour">
                     <div style={{ width: `${(done / list.length) * 100}%` }} />
                   </div>
                 )}
-                <ul className="tasklist">
+                {isOpen && <ul className="tasklist">
                   {list.map((t) => editing === t.id ? (
-                    <TaskEditor key={t.id} task={t} onCancel={() => setEditing(null)} onSave={(patch) => save(t, patch)} onDelete={() => remove(t)} />
+                    <TaskEditor key={t.id} task={t} onCancel={() => setEditing(null)} onSave={(patch) => save(t, patch)} onDelete={() => remove(t)} onMove={(to) => backToBoite(t, to)} />
                   ) : (
                     <li key={t.id} className={`task${t.done ? ' done' : ''}`}>
                       <button type="button" className="check" aria-pressed={!!t.done} aria-label={t.done ? `Rouvrir : ${t.title}` : `Boucler : ${t.title}`} onClick={() => toggle(t)}>
@@ -324,7 +366,7 @@ export function Today() {
                       </button>
                     </li>
                   ))}
-                </ul>
+                </ul>}
               </section>
             );
           })}
@@ -348,21 +390,12 @@ export function Today() {
           </section>
 
           <section className="card">
-            <div className="row"><h2 className="spacer">Boîte à pensées</h2><kbd>⌘⇧8</kbd></div>
-            <p className="small muted" style={{ margin: 0 }}>Vide ta tête : « appeler », « écrire à », une date… {me?.cat_name ?? 'Pilou'} te le rappelle ce soir.</p>
-            <div className="actions"><button type="button" className="btn primary" onClick={() => openCapture({ kind: 'pensee' })}><Icon name="pensee" />Déposer une pensée</button></div>
-          </section>
-
-          <section className="card">
-            <div className="row"><h2 className="spacer">Le Panier</h2><Link to="/panier" className="small" style={{ fontWeight: 600 }}>Tout voir</Link></div>
-            {panier.length === 0 ? <p className="small muted" style={{ margin: 0 }}>Vide pour l’instant. <kbd>⌘⇧9</kbd> ou colle un lien n’importe où.</p> : (
-              <ul className="stack" style={{ listStyle: 'none', margin: 0, padding: 0, gap: 6 }}>
-                {panier.map((p) => <li key={p.id} className="small" style={{ fontWeight: 600 }}>{p.title}</li>)}
-              </ul>
-            )}
-            <div className="banner" style={{ background: 'var(--beurre-pale)', padding: '10px 12px' }}>
-              <Icon name="horloge" /><span className="small" style={{ fontWeight: 600 }}>Récré à {me?.recre} · 20 min</span>
-            </div>
+            <div className="row"><h2 className="spacer">La Boîte</h2><Link to="/boite" className="small" style={{ fontWeight: 600 }}>Ouvrir</Link></div>
+            <p className="small muted" style={{ margin: 0 }}>
+              {`Une idée, un « faut que j’appelle… », un lien : écris-le à ${me?.cat_name ?? 'Pilou'}, il range.`}
+              {panier.length > 0 && ` ${panier.length} truc${panier.length > 1 ? 's' : ''} à explorer pendant la récré (${me?.recre}).`}
+            </p>
+            <div className="actions"><button type="button" className="btn primary" onClick={() => openCapture({})}><Icon name="pensee" />Déposer</button></div>
           </section>
         </aside>
       </div>
@@ -382,8 +415,9 @@ export function Today() {
 }
 
 /** Édition d'une tâche sur place : titre, date, heure, importance. */
-function TaskEditor({ task, onCancel, onSave, onDelete }: {
+function TaskEditor({ task, onCancel, onSave, onDelete, onMove }: {
   task: Task; onCancel: () => void; onSave: (patch: Partial<Task>) => void; onDelete: () => void;
+  onMove: (to: 'note' | 'explorer') => void;
 }) {
   const [title, setTitle] = useState(task.title);
   const [date, setDate] = useState(task.due_date ?? '');
@@ -415,6 +449,11 @@ function TaskEditor({ task, onCancel, onSave, onDelete }: {
           <input type="checkbox" checked={important} onChange={(e) => setImportant(e.target.checked)} style={{ width: 20, height: 20 }} />
           Grande chasse de l’année (important)
         </label>
+        <div className="row wrap small" style={{ gap: 6 }}>
+          <span className="muted">Ce n’est pas une tâche ?</span>
+          <button type="button" className="btn ghost small" onClick={() => onMove('note')}>Remettre en note</button>
+          <button type="button" className="btn ghost small" onClick={() => onMove('explorer')}>Mettre à explorer</button>
+        </div>
         <div className="row wrap">
           <button type="button" className="btn small" onClick={onDelete} style={{ borderColor: '#8A1F45', color: '#8A1F45' }}>
             <Icon name="poubelle" size={16} />Supprimer

@@ -186,6 +186,15 @@ export const api = {
     await batch.commit();
     return { id: tid };
   },
+  /** Supprime une pensée et ses rappels (utilisé pour la reclasser). */
+  async deleteThought(id: string) {
+    const { col } = await home();
+    const rs = await getDocs(query(col('reminders'), where('thought_id', '==', id)));
+    const batch = writeBatch(db);
+    rs.docs.forEach((d) => batch.delete(d.ref));
+    batch.delete(doc(col('thoughts'), id));
+    await batch.commit();
+  },
   async reminders(day: string): Promise<Reminder[]> {
     const rs = await list<Reminder>('reminders', where('remind_on', '<=', day));
     return byCreated(rs.filter((r) => r.status !== 'fait'));

@@ -5,8 +5,7 @@ import './styles.css';
 import { AppProvider } from './store';
 import { Shell } from './components/Shell';
 import { Today } from './pages/Today';
-import { Panier } from './pages/Panier';
-import { Pensees } from './pages/Pensees';
+import { Boite } from './pages/Boite';
 import { Bilan } from './pages/Bilan';
 import { Moi } from './pages/Moi';
 import { Tendances } from './pages/Tendances';
@@ -20,8 +19,9 @@ const router = createBrowserRouter([
     children: [
       { path: '/', element: <Today /> },
       { path: '/partage', element: <Today /> },
-      { path: '/panier', element: <Panier /> },
-      { path: '/pensees', element: <Pensees /> },
+      { path: '/boite', element: <Boite /> },
+      { path: '/panier', element: <Boite /> },
+      { path: '/pensees', element: <Boite /> },
       { path: '/bilan', element: <Bilan /> },
       { path: '/moi', element: <Moi /> },
       { path: '/moi/tendances', element: <Tendances /> },

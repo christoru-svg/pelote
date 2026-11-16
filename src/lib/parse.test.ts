@@ -64,6 +64,22 @@ describe('parseThought', () => {
     expect(p.actions.map((a) => a.label)).toEqual(['Écrire à la compta']);
     expect(p.ideas).toEqual(['Et si Pilou changeait de tête selon mon énergie']);
   });
+  it('reconnaît les verbes conjugués après je / j\'', () => {
+    const p = parseThought('Il faut que j\'appelle Paupiette demain', REF);
+    expect(p.actions).toEqual([{ label: 'Appeler Paupiette demain', due_date: '2026-11-17', due_time: null }]);
+    expect(parseThought('je relance Marc pour le devis', REF).actions[0].label).toBe('Relancer Marc');
+  });
+  it('ne prend pas un nom pour un verbe', () => {
+    expect(parseThought('ma commande est arrivée', REF).actions).toEqual([]);
+  });
+  it('les tournures d’obligation deviennent des rappels', () => {
+    expect(parseThought('mmmh intéressant, il faudra que je pense à arroser les plantes', REF).actions[0].label).toBe('Arroser les plantes');
+    expect(parseThought('je dois finir le moodboard', REF).actions[0].label).toBe('Finir le moodboard');
+    expect(parseThought('ne pas oublier de sortir les poubelles', REF).actions[0].label).toBe('Sortir les poubelles');
+  });
+  it('une date seule devient un rappel', () => {
+    expect(parseThought('Dîner chez Lola samedi', REF).actions).toEqual([{ label: 'Dîner chez Lola samedi', due_date: '2026-11-21', due_time: null }]);
+  });
   it('rien à détecter', () => {
     expect(parseThought('Journée calme.', REF)).toMatchObject({ actions: [], ideas: [] });
   });

@@ -1,3 +1,4 @@
+import { useApp } from '../store';
 // Pilou, en pied (8 robes) et en tête (5 humeurs).
 
 const T = 'transparent';
@@ -76,18 +77,36 @@ const FACES = [
   { eyes: EYES_CLOSED, fill: 'none', mouth: 'M26 45.5 Q29 49 32 45.5 Q35 49 38 45.5' },
 ];
 
-/** Tête de chat expressive pour une humeur 1..5. */
-export function Face({ mood, size = 40, light = true }: { mood: number; size?: number; light?: boolean }) {
+const isDark = (hex: string) => {
+  const n = parseInt(hex.replace('#', ''), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  return 0.299 * r + 0.587 * g + 0.114 * b < 110;
+};
+
+/**
+ * Tête du chat choisi à l'onboarding, avec une expression par humeur (1..5).
+ * `light` = posée sur un fond foncé : le contour devient blanc pour rester lisible.
+ */
+export function Face({ mood, size = 40, light = true, coat: forced }: { mood: number; size?: number; light?: boolean; coat?: Coat }) {
+  const { me } = useApp();
+  const c = forced ?? coatOf(me?.cat_coat);
   const f = FACES[Math.min(4, Math.max(0, mood - 1))];
-  const fur = light ? '#F6F2FF' : INK;
-  const ink = light ? INK : '#FFD25E';
+  const outline = light ? '#F6F2FF' : INK;
+  const eyeInk = isDark(c.head) ? '#F6F2FF' : INK;
+  const mouthInk = isDark(c.muzzle) ? '#F6F2FF' : INK;
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
-      <path d="M10 30 L13 6 L28 17 Z M54 30 L51 6 L36 17 Z" fill={fur} />
-      <ellipse cx="32" cy="37" rx="23" ry="20" fill={fur} />
-      <path d={f.eyes} fill={f.fill === 'none' ? 'none' : ink} stroke={ink} strokeWidth="2.6" strokeLinecap="round" />
+      <path d="M10 30 L13 6 L28 17 Z M54 30 L51 6 L36 17 Z" fill={c.head} stroke={outline} strokeWidth="2.2" strokeLinejoin="round" />
+      <path d="M14.5 14 L15.5 21 L22 17 Z M49.5 14 L48.5 21 L42 17 Z" fill="#FF8FB1" />
+      <ellipse cx="32" cy="37" rx="23" ry="20" fill={c.head} />
+      <path d="M13 33 Q17 21 29 20 Q27 31 14 40 Z" fill={c.patchA} />
+      <path d="M36 20 Q47 21 52 31 Q44 35 38 27 Z" fill={c.patchB} />
+      <path d="M27 21 L29 25.5 L32 22 L35 25.5 L37 21" fill="none" stroke={c.stripe} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <ellipse cx="32" cy="45" rx="9.5" ry="6" fill={c.muzzle} />
+      <ellipse cx="32" cy="37" rx="23" ry="20" fill="none" stroke={outline} strokeWidth="2.2" />
+      <path d={f.eyes} fill={f.fill === 'none' ? 'none' : eyeInk} stroke={eyeInk} strokeWidth="2.6" strokeLinecap="round" />
       <path d="M30 41 L34 41 L32 43.5 Z" fill="#FF8FB1" />
-      <path d={f.mouth} fill="none" stroke={light ? INK : '#F6F2FF'} strokeWidth="2.4" strokeLinecap="round" />
+      <path d={f.mouth} fill="none" stroke={mouthInk} strokeWidth="2.4" strokeLinecap="round" />
     </svg>
   );
 }

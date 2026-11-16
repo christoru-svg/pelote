@@ -125,6 +125,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(t);
   }, [recreEnd, fil, notify, setRecreEnd]);
 
+  useEffect(() => {
+    if (!me?.cat_name) return;
+    try { localStorage.setItem('pelote-chat', me.cat_name); } catch { /* navigation privée : tant pis */ }
+  }, [me?.cat_name]);
+
   const value = useMemo<Ctx>(() => ({
     me, setMe, fil, setFil, latest, statesLoaded, refreshStates,
     capture, openCapture: (p = {}) => setCapture(p), closeCapture: () => setCapture(null),

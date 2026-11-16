@@ -9,6 +9,7 @@ import { useApp } from '../store';
 import { URL_RE } from '../lib/autotag';
 import { today, ymd } from '../lib/dates';
 import { Login } from '../pages/Login';
+import { IMAGES_ENABLED } from '../firebase-config';
 
 const isTyping = (t: EventTarget | null) =>
   t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName));
@@ -61,7 +62,7 @@ export function Shell() {
       if (isTyping(e.target) || capture) return;
       const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith('image/'));
       const text = e.clipboardData?.getData('text') ?? '';
-      if (file) openCapture({ kind: 'panier', image: file });
+      if (file && IMAGES_ENABLED) openCapture({ kind: 'panier', image: file });
       else if (URL_RE.test(text)) openCapture({ kind: 'panier', text });
     };
     window.addEventListener('paste', onPaste);
@@ -120,7 +121,7 @@ export function Shell() {
       </main>
     );
   }
-  if (!me) return <main className="page" aria-busy="true"><p className="pilou">Pilou s’étire…</p></main>;
+  if (!me) return <main className="page" aria-busy="true"><p className="pilou">{localStorageGet('pelote-chat') || 'Pilou'} s’étire…</p></main>;
   if (loc.pathname === '/bienvenue') return <Outlet />;
 
   const coat = coatOf(me.cat_coat);
@@ -134,8 +135,7 @@ export function Shell() {
           <Link to="/" className="brand"><Logo />Pelote</Link>
           <nav className="pillnav" aria-label="Navigation principale">
             <NavLink to="/" end className={link}>Aujourd’hui</NavLink>
-            <NavLink to="/panier" className={link}>Le Panier {panierCount > 0 && <span className="count">{panierCount}</span>}</NavLink>
-            <NavLink to="/pensees" className={link}>Pensées</NavLink>
+            <NavLink to="/boite" className={link}>La Boîte {panierCount > 0 && <span className="count">{panierCount}</span>}</NavLink>
           </nav>
           <div className="row desk-only">
             <button type="button" className="btn ghost" onClick={() => setEtatOpen(true)} aria-label="Humeur et énergie : modifier" aria-busy={!statesLoaded}>
@@ -144,11 +144,7 @@ export function Shell() {
             </button>
             <button type="button" className="btn primary" onClick={() => openCapture({})} aria-label="Déposer (⌘⇧9)"><Icon name="plus" />Déposer</button>
             <NavLink to="/moi" className="avatar-link" aria-label={`Mon profil (${me.cat_name})`}>
-              <svg width="30" height="30" viewBox="0 0 64 64" aria-hidden="true">
-                <path d="M10 30 L13 6 L28 17 Z M54 30 L51 6 L36 17 Z" fill={coat.head === '#2B2440' ? '#F6F2FF' : coat.head} />
-                <ellipse cx="32" cy="37" rx="23" ry="20" fill={coat.head === '#2B2440' ? '#F6F2FF' : coat.head} />
-                <path d="M21 35 Q24 31.5 27 35 M37 35 Q40 31.5 43 35" fill="none" stroke="#1F1A3D" strokeWidth="3" strokeLinecap="round" />
-              </svg>
+              <Face mood={latest?.mood ?? 4} size={34} light />
             </NavLink>
           </div>
         </header>
@@ -156,10 +152,10 @@ export function Shell() {
 
       {recreEnd && (
         <div className="page" style={{ paddingTop: 12, paddingBottom: 0 }}>
-          <Link to="/panier" className="banner" style={{ background: 'var(--coussinet)', textDecoration: 'none', color: 'var(--nuit)' }}>
-            <Icon name="horloge" />
-            <span style={{ flex: '1 1 auto', fontWeight: 700 }}>Récré en cours</span>
-            <span style={{ fontFamily: 'var(--titre)', fontWeight: 800, fontSize: 20 }} aria-label="temps restant">
+          <Link to="/boite" className="banner" style={{ background: 'var(--coussinet-pale)', textDecoration: 'none', color: 'var(--nuit)', padding: '8px 14px' }}>
+            <Icon name="horloge" size={18} />
+            <span className="small" style={{ flex: '1 1 auto', fontWeight: 600 }}>Récré en cours</span>
+            <span className="small" style={{ fontWeight: 700 }} aria-label="temps restant">
               {String(Math.floor(Math.max(0, recreEnd - Date.now()) / 60000)).padStart(2, '0')}:{String(Math.floor((Math.max(0, recreEnd - Date.now()) % 60000) / 1000)).padStart(2, '0')}
             </span>
           </Link>
@@ -194,8 +190,7 @@ export function Shell() {
 
       <nav className="tabbar" aria-label="Navigation principale">
         <NavLink to="/" end className={link}><Icon name="liste" size={22} />Aujourd’hui</NavLink>
-        <NavLink to="/panier" className={link}><Icon name="panier" size={22} />Panier</NavLink>
-        <NavLink to="/pensees" className={link}><Icon name="pensee" size={22} />Pensées</NavLink>
+        <NavLink to="/boite" className={link}><Icon name="pensee" size={22} />Boîte</NavLink>
         <NavLink to="/moi" className={link}><Icon name="moi" size={22} />Moi</NavLink>
       </nav>
 
