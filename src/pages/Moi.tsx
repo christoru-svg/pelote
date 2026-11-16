@@ -17,7 +17,51 @@ export function Moi() {
 
   return (
     <ProfileLayout title="Moi" lede="Qui tu es, et qui veille sur toi.">
-      <div className="cols" style={{ alignItems: 'stretch' }}>
+      {/* Mobile : version compacte, dans l'ordre email → chat → en ce moment → stats → réglages */}
+      <div className="mob-only stack" style={{ gap: 10 }}>
+        <div className="row" style={{ gap: 10 }}>
+          <span aria-hidden="true" style={{ width: 36, height: 36, borderRadius: 999, background: 'var(--beurre)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--titre)', fontWeight: 800 }}>
+            {me.email[0]?.toUpperCase()}
+          </span>
+          <span className="small spacer" style={{ fontWeight: 600, overflowWrap: 'anywhere' }}>{me.email}</span>
+        </div>
+
+        <section className="card lav" aria-labelledby="chat-nom-m" style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: '12px 14px', boxShadow: '0 4px 0 var(--nuit)' }}>
+          <Cat coat={coat} size={64} label={`${me.cat_name}, ${coat.name.toLowerCase()}`} />
+          <div className="stack spacer" style={{ gap: 0, minWidth: 0 }}>
+            <h2 id="chat-nom-m" style={{ fontSize: 24, fontWeight: 800 }}>{me.cat_name}</h2>
+            <span className="small" style={{ fontWeight: 600 }}>{coat.name} · {days} jour{days > 1 ? 's' : ''} ensemble</span>
+          </div>
+          <Link className="btn primary small" to="/bienvenue">Changer</Link>
+        </section>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+          <button type="button" className="tile" onClick={() => setEtatOpen('mood')} style={{ background: 'var(--coussinet-pale)', border: 'none', textAlign: 'left', cursor: 'pointer', minHeight: 56 }}>
+            <span className="small" style={{ fontWeight: 700 }}>Humeur</span>
+            <strong style={{ fontFamily: 'var(--titre)', fontSize: 17 }}>{latest?.mood ? MOODS[latest.mood - 1] : 'À noter'}</strong>
+          </button>
+          <button type="button" className="tile" onClick={() => setEtatOpen('energy')} style={{ background: 'var(--menthe-pale)', border: 'none', textAlign: 'left', cursor: 'pointer', minHeight: 56 }}>
+            <span className="small" style={{ fontWeight: 700 }}>Énergie</span>
+            <strong style={{ fontFamily: 'var(--titre)', fontSize: 17 }}>{latest?.energy ? ENERGIES[latest.energy - 1].name : 'À noter'}</strong>
+          </button>
+        </div>
+
+        <dl className="card dark" style={{ margin: 0, padding: '10px 12px', display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 4 }}>
+          {[
+            [stats?.done ?? 0, 'bouclés', 'var(--menthe)'],
+            [stats?.panier ?? 0, 'trouvailles', 'var(--coussinet)'],
+            [stats?.knots ?? 0, 'nœuds', 'var(--lavande)'],
+            [stats?.thoughts ?? 0, 'pensées', 'var(--beurre)'],
+          ].map(([n, label, color]) => (
+            <div key={label as string} style={{ display: 'flex', flexDirection: 'column-reverse', alignItems: 'center' }}>
+              <dt style={{ fontSize: 12, color: 'var(--texte-inv)' }}>{label}</dt>
+              <dd style={{ margin: 0, fontFamily: 'var(--titre)', fontSize: 22, fontWeight: 800, color: color as string }}>{n}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+
+      <div className="cols desk-only" style={{ alignItems: 'stretch' }}>
         <section className="card lav" aria-labelledby="chat-nom" style={{ flex: '1 1 300px', alignItems: 'center', textAlign: 'center' }}>
           <span className="eyebrow" style={{ alignSelf: 'flex-start' }}>Ton chat</span>
           <Cat coat={coat} size={180} label={`${me.cat_name}, ${coat.name.toLowerCase()}`} />

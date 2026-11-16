@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
+import { BackButton } from './BackButton';
 
 const PAGES = [
   ['/moi', 'Moi'],
@@ -9,8 +10,10 @@ const PAGES = [
 ] as const;
 
 export function ProfileLayout({ title, lede, children }: { title: string; lede: string; children: ReactNode }) {
+  const loc = useLocation();
   return (
     <main className="page">
+      {loc.pathname !== '/moi' && <BackButton fallback="/moi" label="Moi" />}
       <div className="cols">
         <nav aria-label="Mon profil" className="desk-only" style={{ flex: '1 1 220px', display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span className="eyebrow muted" style={{ marginBottom: 8 }}>Mon profil</span>

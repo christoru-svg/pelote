@@ -64,15 +64,37 @@ export function Today() {
   const todayDone = groups.today.filter((t) => t.done).length;
   const todayTotal = groups.today.length;
 
-  async function addQuick() {
+  async function addQuick(asFil = false) {
     if (!parsed) return;
     try {
       const t = await api.addTask({ title: parsed.title, due_date: parsed.due_date, due_time: parsed.due_time, minutes: parsed.minutes, tag: parsed.tag, important: parsed.important ? 1 : 0 });
       setTasks((xs) => [...xs, t]);
       setQuick('');
-      notify('Sujet ajouté', `Rangé dans ${HORIZON_LABEL[horizonOf(t, ref)]}.`);
+      if (asFil) {
+        setFil(await api.setFil({ task_id: t.id, title: t.title }));
+        notify('C’est ton fil', `${me?.cat_name ?? 'Pilou'} garde la porte.`);
+      } else {
+        notify('Sujet ajouté', `Rangé dans ${HORIZON_LABEL[horizonOf(t, ref)]}.`);
+      }
     } catch { fail('Le sujet n’a pas été ajouté'); }
   }
+
+  const quickHelp = parsed ? (
+    <div id="ajout-aide" className="row wrap small" aria-live="polite">
+      <span><Highlight text={quick} marks={parsed.marks} /></span>
+      <span className="muted">→</span>
+      <span className="chip" style={{ background: 'var(--lait)' }}>
+        {HORIZON_LABEL[horizonOf({ due_date: parsed.due_date, important: parsed.important }, ref)]}
+        {parsed.due_date && ` · ${formatDay(parsed.due_date)}`}{parsed.due_time && ` ${parsed.due_time}`}
+      </span>
+      {parsed.tag && <span className="chip">{parsed.tag}</span>}
+      {parsed.minutes && <span className="chip" style={{ background: 'var(--menthe-pale)' }}>{formatMinutes(parsed.minutes)}</span>}
+    </div>
+  ) : (
+    <p id="ajout-aide" className="small muted" style={{ margin: 0 }}>
+      Ex. « Kick-off lundi 10h #équipe 1h » : une date dans le titre et c’est rangé.
+    </p>
+  );
 
   async function toggle(t: Task) {
     const next = t.done ? 0 : 1;
@@ -156,14 +178,14 @@ export function Today() {
 
       {/* Humeur et énergie à portée de pouce sur mobile */}
       <div className="mob-only" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
-        <button type="button" className="tile" onClick={() => setEtatOpen(true)} aria-label={`Humeur : ${latest?.mood ? MOODS[latest.mood - 1] : 'pas notée'}. Modifier`}
+        <button type="button" className="tile" onClick={() => setEtatOpen('mood')} aria-label={`Humeur : ${latest?.mood ? MOODS[latest.mood - 1] : 'pas notée'}. Modifier`}
           style={{ background: 'var(--coussinet-pale)', border: 'none', flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 56, cursor: 'pointer', textAlign: 'left' }}>
           {latest?.mood ? <Face mood={latest.mood} size={34} light={false} /> : <Icon name="humeur" size={28} />}
           <span className="stack spacer" style={{ gap: 0 }}><span className="small" style={{ fontWeight: 700, color: 'var(--texte-3)' }}>Humeur</span>
             <strong style={{ fontFamily: 'var(--titre)', fontSize: 17 }}>{!statesLoaded ? '…' : latest?.mood ? MOODS[latest.mood - 1] : 'À noter'}</strong></span>
           <Icon name="chevron" size={16} />
         </button>
-        <button type="button" className="tile" onClick={() => setEtatOpen(true)} aria-label={`Énergie : ${latest?.energy ? ENERGIES[latest.energy - 1].name : 'pas notée'}. Modifier`}
+        <button type="button" className="tile" onClick={() => setEtatOpen('energy')} aria-label={`Énergie : ${latest?.energy ? ENERGIES[latest.energy - 1].name : 'pas notée'}. Modifier`}
           style={{ background: 'var(--menthe-pale)', border: 'none', flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 56, cursor: 'pointer', textAlign: 'left' }}>
           <EnergyBars level={latest?.energy ?? 0} on />
           <span className="stack spacer" style={{ gap: 0 }}><span className="small" style={{ fontWeight: 700, color: 'var(--texte-3)' }}>Énergie</span>
@@ -196,19 +218,36 @@ export function Today() {
             </div>
           </>
         ) : (
-          <>
-            <div style={{ flex: '999 1 300px' }}>
+          <form className="stack" style={{ flex: '999 1 300px', minWidth: 0, gap: 10 }} onSubmit={(e) => { e.preventDefault(); addQuick(true); }}>
+            <div>
               <div className="eyebrow">Le fil</div>
-              <div className="fil-title" style={{ fontSize: 20 }}>Sur quoi tu te poses maintenant ?</div>
-              {suggestion && <div className="small muted">Suggestion{sieste ? ' (mode Sieste, petit morceau)' : ''} : {suggestion.title}</div>}
+              <label htmlFor="ajout-rapide" className="fil-title" style={{ fontSize: 20, display: 'block' }}>Sur quoi tu te poses maintenant ?</label>
             </div>
-            {suggestion && <div className="actions"><button type="button" className="btn primary" onClick={() => startFil(suggestion)}>Prendre ce fil</button></div>}
-          </>
+            <div className="row" style={{ background: 'var(--blanc)', border: '2px solid var(--nuit)', borderRadius: 18, padding: '4px 4px 4px 14px' }}>
+              <input id="ajout-rapide" value={quick} onChange={(e) => setQuick(e.target.value)} placeholder="Nouveau sujet…" autoComplete="off" aria-describedby="ajout-aide"
+                style={{ flex: '1 1 auto', minWidth: 0, border: 'none', background: 'transparent', fontSize: 17, minHeight: 44, outline: 'none' }} />
+              <kbd className="desk-only">N</kbd>
+            </div>
+            {quickHelp}
+            <div className="row wrap">
+              {suggestion && !quick && (
+                <button type="button" className="btn ghost small" onClick={() => startFil(suggestion)} style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <Icon name="fil" size={16} />Reprendre : {suggestion.title}
+                </button>
+              )}
+              <span className="spacer" />
+              <div className="actions">
+                <button type="button" className="btn small" disabled={!parsed} onClick={() => addQuick(false)}>Juste l’ajouter</button>
+                <button type="submit" className="btn primary small" disabled={!parsed}>C’est mon fil</button>
+              </div>
+            </div>
+          </form>
         )}
       </section>
 
       <div className="cols">
         <div className="col-main">
+          {fil && (
           <section aria-label="Ajout rapide" className="bigbar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
             <form className="row" onSubmit={(e) => { e.preventDefault(); addQuick(); }}>
               <label htmlFor="ajout-rapide" className="sr-only">Nouveau sujet</label>
@@ -219,23 +258,9 @@ export function Today() {
               <kbd className="desk-only">N</kbd>
               <button type="submit" className="btn primary" disabled={!parsed}>Ajouter</button>
             </form>
-            {parsed ? (
-              <div id="ajout-aide" className="row wrap small" style={{ paddingLeft: 46 }} aria-live="polite">
-                <span><Highlight text={quick} marks={parsed.marks} /></span>
-                <span className="muted">→</span>
-                <span className="chip" style={{ background: 'var(--lait)' }}>
-                  {HORIZON_LABEL[horizonOf({ due_date: parsed.due_date, important: parsed.important }, ref)]}
-                  {parsed.due_date && ` · ${formatDay(parsed.due_date)}`}{parsed.due_time && ` ${parsed.due_time}`}
-                </span>
-                {parsed.tag && <span className="chip">{parsed.tag}</span>}
-                {parsed.minutes && <span className="chip" style={{ background: 'var(--menthe-pale)' }}>{formatMinutes(parsed.minutes)}</span>}
-              </div>
-            ) : (
-              <p id="ajout-aide" className="small muted" style={{ margin: 0, paddingLeft: 46 }}>
-                Ex. « Kick-off lundi 10h #équipe 1h » : une date dans le titre et c’est rangé.
-              </p>
-            )}
+            <div style={{ paddingLeft: 46 }}>{quickHelp}</div>
           </section>
+          )}
 
           {!loaded && (
             <div className="card" aria-busy="true"><p className="pilou" style={{ margin: 0 }}>{me?.cat_name ?? 'Pilou'} rassemble tes tâches…</p></div>

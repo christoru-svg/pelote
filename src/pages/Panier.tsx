@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, type PanierItem } from '../api';
 import { Face } from '../components/Cat';
 import { Icon } from '../components/Icon';
-import { domainOf } from '../lib/autotag';
+import { autotag, domainOf, URL_RE } from '../lib/autotag';
 import { parseStamp } from '../lib/dates';
 import { useApp } from '../store';
 
@@ -17,7 +17,9 @@ function ago(s: string) {
 }
 
 export function Panier() {
-  const { me, openCapture, version, setPanierCount, notify, fail, recreEnd, setRecreEnd } = useApp();
+  const { me, fil, openCapture, version, setPanierCount, notify, fail, recreEnd, setRecreEnd } = useApp();
+  const [draft, setDraft] = useState('');
+  const [busy, setBusy] = useState(false);
   const [items, setItems] = useState<PanierItem[]>([]);
   const [filter, setFilter] = useState<string>('Tout');
   const [, tick] = useState(0);
@@ -86,6 +88,25 @@ export function Panier() {
     });
   }
 
+  async function deposit(e: React.FormEvent) {
+    e.preventDefault();
+    const text = draft.trim();
+    if (!text) return;
+    const url = text.match(URL_RE)?.[0] ?? null;
+    const body = text.replace(URL_RE, '').trim();
+    setBusy(true);
+    try {
+      const item = await api.addPanier({
+        title: (body || url || text).split('\n')[0].slice(0, 120), body: body || null, url,
+        tag: autotag(text, url), context: fil ? `pendant ${fil.title}` : 'hors fil',
+      });
+      setItems((xs) => [item, ...xs]);
+      setPanierCount(items.length + 1);
+      setDraft('');
+      notify('Hop, dans le Panier', fil ? `Retour au fil : ${fil.title}` : undefined);
+    } catch { fail('La trouvaille n’a pas été déposée'); } finally { setBusy(false); }
+  }
+
   const left = recreEnd ? Math.max(0, recreEnd - Date.now()) : 0;
 
   return (
@@ -109,13 +130,21 @@ export function Panier() {
               <span className="eyebrow">Prochaine récré · {me?.recre}</span>
               <div style={{ fontFamily: 'var(--titre)', fontSize: 24, fontWeight: 700, lineHeight: 1.2 }}>{RECRE_MIN} min pour ressortir {Math.min(6, items.filter((p) => !p.opened_at).length) || 'tes'} trouvailles, sans culpabilité.</div>
               <div className="actions">
-                <button type="button" className="btn" onClick={() => openCapture({ kind: 'panier' })}>Déposer</button>
+                <button type="button" className="btn desk-only" onClick={() => openCapture({ kind: 'panier' })}>Capture</button>
                 <button type="button" className="btn primary" disabled={!items.length} onClick={() => setRecreEnd(Date.now() + RECRE_MIN * 60000)}>Ouvrir maintenant</button>
               </div>
             </>
           )}
         </section>
       </div>
+
+      {!recreEnd && (
+        <form className="bigbar" onSubmit={deposit}>
+          <label htmlFor="panier-depot" className="sr-only">Déposer dans le Panier</label>
+          <input id="panier-depot" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Colle un lien ou note une trouvaille…" autoComplete="off" />
+          <button type="submit" className="btn primary" disabled={busy || !draft.trim()}>Déposer</button>
+        </form>
+      )}
 
       {!recreEnd && (
         <div className="filters" role="group" aria-label="Filtres">

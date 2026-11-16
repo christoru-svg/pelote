@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, type Reminder } from '../api';
 import { ENERGIES, Face, MOODS } from '../components/Cat';
 import { localStorageSet } from '../components/Shell';
+import { BackButton } from '../components/BackButton';
 import { addDays, formatDay, parseStamp, today, ymd } from '../lib/dates';
 import { useApp } from '../store';
 
@@ -34,6 +35,7 @@ export function Bilan() {
 
   return (
     <main className="page" style={{ maxWidth: 760 }}>
+      <BackButton fallback="/moi" />
       <div className="row">
         <Face mood={4} size={56} light={false} />
         <div>

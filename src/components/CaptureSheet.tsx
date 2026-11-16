@@ -110,7 +110,12 @@ export function CaptureSheet() {
         </label>
         <textarea id="capture-texte" className="input" rows={3} value={text} placeholder={placeholder}
           onChange={(e) => setText(e.target.value)}
+          onPaste={(e) => {
+            const file = [...e.clipboardData.files].find((f) => f.type.startsWith('image/'));
+            if (file) { e.preventDefault(); setImage(file); if (kind !== 'panier') setKind('panier'); }
+          }}
           onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit(); }} />
+        {kind === 'panier' && <span className="small muted">Pour coller : <span className="desk-only">⌘V dans le champ</span><span className="mob-only">appui long dans le champ, puis « Coller »</span>.</span>}
       </div>
 
       {task && (
@@ -133,18 +138,7 @@ export function CaptureSheet() {
               <button type="button" className="iconbtn" aria-label="Retirer l’image" onClick={() => setImage(null)} style={{ position: 'absolute', top: 8, right: 8 }}><Icon name="close" /></button>
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
-            <button type="button" className="btn ghost" onClick={async () => {
-              try {
-                const items = await navigator.clipboard.read();
-                for (const it of items) {
-                  const t = it.types.find((x) => x.startsWith('image/'));
-                  if (t) { const b = await it.getType(t); setImage(new File([b], 'colle.png', { type: t })); return; }
-                }
-                const pasted = await navigator.clipboard.readText();
-                setText((x) => x + (x ? ' ' : '') + pasted);
-              } catch { setErr('Le navigateur n’a pas donné accès au presse-papiers. Utilise ⌘V dans le champ.'); }
-            }}><Icon name="coller" />Coller</button>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
             <label className="btn ghost" style={{ cursor: 'pointer' }}>
               <Icon name="photo" />Image
               <input type="file" accept="image/*" className="sr-only" onChange={(e) => setImage(e.target.files?.[0] ?? null)} />

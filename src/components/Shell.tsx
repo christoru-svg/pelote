@@ -124,12 +124,13 @@ export function Shell() {
   if (loc.pathname === '/bienvenue') return <Outlet />;
 
   const coat = coatOf(me.cat_coat);
+  const subPage = loc.pathname === '/bilan' || (loc.pathname.startsWith('/moi/'));
   const link = ({ isActive }: { isActive: boolean }) => (isActive ? 'active' : '');
 
   return (
     <div className="app">
       <div className="page" style={{ paddingBottom: 0 }}>
-        <header className="topbar">
+        <header className={`topbar${subPage ? ' sub' : ''}`}>
           <Link to="/" className="brand"><Logo />Pelote</Link>
           <nav className="pillnav" aria-label="Navigation principale">
             <NavLink to="/" end className={link}>Aujourd’hui</NavLink>
@@ -194,9 +195,6 @@ export function Shell() {
       <nav className="tabbar" aria-label="Navigation principale">
         <NavLink to="/" end className={link}><Icon name="liste" size={22} />Aujourd’hui</NavLink>
         <NavLink to="/panier" className={link}><Icon name="panier" size={22} />Panier</NavLink>
-        <button type="button" className="plus" aria-label="Déposer une tâche, une pensée ou une trouvaille" onClick={() => openCapture({})}>
-          <Icon name="plus" size={28} stroke={2.8} color="#1F1A3D" />
-        </button>
         <NavLink to="/pensees" className={link}><Icon name="pensee" size={22} />Pensées</NavLink>
         <NavLink to="/moi" className={link}><Icon name="moi" size={22} />Moi</NavLink>
       </nav>

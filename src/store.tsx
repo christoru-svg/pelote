@@ -5,6 +5,7 @@ import { addDays, ymd, today } from './lib/dates';
 
 export type CaptureKind = 'tache' | 'pensee' | 'panier';
 export type CapturePrefill = { kind?: CaptureKind; text?: string; url?: string; image?: File | null; title?: string };
+export type EtatMode = 'mood' | 'energy' | 'both';
 export type Toast = {
   title: string;
   text?: string;
@@ -23,8 +24,9 @@ type Ctx = {
   capture: CapturePrefill | null;
   openCapture: (p?: CapturePrefill) => void;
   closeCapture: () => void;
-  etatOpen: boolean;
-  setEtatOpen: (b: boolean) => void;
+  etatOpen: EtatMode | false;
+  /** true = humeur + énergie ; 'mood' ou 'energy' = une seule des deux. */
+  setEtatOpen: (m: boolean | EtatMode) => void;
   toast: Toast | null;
   notify: (title: string, text?: string, opts?: Pick<Toast, 'tone' | 'action'>) => void;
   /** Toast d'erreur standard quand une action n'a pas pu être enregistrée. */
@@ -62,7 +64,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [latest, setLatest] = useState<State | null>(null);
   const [statesLoaded, setStatesLoaded] = useState(false);
   const [capture, setCapture] = useState<CapturePrefill | null>(null);
-  const [etatOpen, setEtatOpen] = useState(false);
+  const [etatOpen, setEtatState] = useState<EtatMode | false>(false);
+  const setEtatOpen = useCallback((m: boolean | EtatMode) => setEtatState(m === true ? 'both' : m), []);
   const [toast, setToast] = useState<Toast | null>(null);
   const [panierCount, setPanierCount] = useState(0);
   const [recreEnd, setRecreEndState] = useState<number | null>(readRecre);
