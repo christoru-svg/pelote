@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { api, imageUrl, type PanierItem } from '../api';
+import { api, type PanierItem } from '../api';
 import { Face } from '../components/Cat';
 import { Icon } from '../components/Icon';
 import { domainOf } from '../lib/autotag';
@@ -137,7 +137,7 @@ export function Panier() {
         <div className="masonry">
           {shown.map((p) => (
             <article key={p.id} className="pcard">
-              {p.image_key && <img src={imageUrl(p.image_key)} alt={p.title} loading="lazy" />}
+              {p.image_url && <img src={p.image_url} alt={p.title} loading="lazy" />}
               <div className="body">
                 {p.kind === 'texte' && p.body && p.body !== p.title && <blockquote>« {p.body.length > 220 ? p.body.slice(0, 220) + '…' : p.body} »</blockquote>}
                 <strong style={{ fontSize: 15, overflowWrap: 'anywhere' }}>{p.title}</strong>

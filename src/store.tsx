@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, type Fil, type Me, type State } from './api';
+import { isConfigured, watchUser } from './firebase';
 import { addDays, ymd, today } from './lib/dates';
 
 export type CaptureKind = 'tache' | 'pensee' | 'panier';
@@ -36,6 +37,8 @@ type Ctx = {
   version: number;      // incrémenté quand une capture change les données
   bump: () => void;
   error: string | null;
+  /** null = on ne sait pas encore, false = connecté, true = écran de connexion. */
+  needsLogin: boolean | null;
 };
 
 const C = createContext<Ctx | null>(null);
@@ -65,6 +68,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [recreEnd, setRecreEndState] = useState<number | null>(readRecre);
   const [version, setVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [needsLogin, setNeedsLogin] = useState<boolean | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
 
   const refreshStates = useCallback(async () => {
@@ -74,11 +78,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    api.me()
-      .then((m) => { setMe(m); setFil(m.fil); })
-      .catch((e) => setError(e.status === 401 ? 'Tu n’es pas connecté·e. Recharge la page pour passer par la connexion.' : 'Pelote n’arrive pas à joindre son serveur.'));
-    refreshStates().catch(() => setStatesLoaded(true));
-    api.panier().then((p) => setPanierCount(p.length)).catch(() => {});
+    if (!isConfigured) { setNeedsLogin(false); setError('Pelote n’est pas encore relié à son projet Firebase (src/firebase-config.ts).'); return; }
+    return watchUser((u) => {
+      if (!u) { setNeedsLogin(true); setMe(null); return; }
+      setNeedsLogin(false);
+      setError(null);
+      api.me()
+        .then((m) => { setMe(m); setFil(m.fil); })
+        .catch((e) => setError((e as { code?: string }).code === 'permission-denied'
+          ? `Le compte ${u.email} n’est pas autorisé sur cette Pelote.`
+          : 'Pelote n’arrive pas à joindre son serveur.'));
+      refreshStates().catch(() => setStatesLoaded(true));
+      api.panier().then((p) => setPanierCount(p.length)).catch(() => {});
+    });
   }, [refreshStates]);
 
   const notify = useCallback((title: string, text?: string, opts?: Pick<Toast, 'tone' | 'action'>) => {
@@ -115,8 +127,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     capture, openCapture: (p = {}) => setCapture(p), closeCapture: () => setCapture(null),
     etatOpen, setEtatOpen, toast, notify, fail, dismissToast, panierCount, setPanierCount,
     recreEnd, setRecreEnd,
-    version, bump: () => setVersion((v) => v + 1), error,
-  }), [me, fil, latest, statesLoaded, refreshStates, capture, etatOpen, toast, notify, fail, dismissToast, panierCount, recreEnd, setRecreEnd, version, error]);
+    version, bump: () => setVersion((v) => v + 1), error, needsLogin,
+  }), [me, fil, latest, statesLoaded, refreshStates, capture, etatOpen, toast, notify, fail, dismissToast, panierCount, recreEnd, setRecreEnd, version, error, needsLogin]);
 
   return <C.Provider value={value}>{children}</C.Provider>;
 }

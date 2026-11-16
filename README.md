@@ -9,54 +9,38 @@ Une app (web installable, desktop + mobile) pour cerveaux TDAH : une seule inten
 | Partie | Techno |
 |---|---|
 | Front | React 18 + Vite, PWA (installable, partage Android) |
-| API | Cloudflare Pages Functions (`functions/api/[[path]].ts`) |
-| Données | Cloudflare D1 (SQLite) — `migrations/` |
-| Images du Panier | Cloudflare R2 |
-| Connexion | Cloudflare Access (Google ou code par email), JWT vérifié côté API |
+| Connexion | Firebase Auth (Google), limitée aux adresses listées dans les règles |
+| Données | Cloud Firestore, avec cache hors ligne : tout est rangé sous `users/{uid}/…` |
+| Images du Panier | Firebase Storage (`users/{uid}/panier/…`) |
+| Hébergement | Firebase Hosting |
+
+La sécurité vient des règles `firestore.rules` et `storage.rules` : chaque personne ne voit que ses données, et seules les adresses de la liste peuvent se connecter.
 
 ## Lancer en local
 
-Prérequis : Node 20+.
+Prérequis : Node 20+, et la config de ton projet Firebase dans `src/firebase-config.ts`.
 
 ```bash
 npm install
-npm run db:local          # crée la base D1 locale
-npm test                  # tests du parser français
+npm test        # tests du parser français
+npm run dev     # http://localhost:5173 (données réelles de ton projet Firebase)
 ```
 
-Puis, dans deux terminaux :
+## Mettre en ligne
 
-```bash
-npm run build && npx wrangler pages dev dist --port 8788   # API + base locale
-```
-
-```bash
-npm run dev               # front avec rechargement à chaud, sur http://localhost:5173
-```
-
-En local, l'utilisateur est simulé par `DEV_USER` (fichier `.dev.vars`, jamais déployé).
-
-## Mettre en ligne (GitHub + Cloudflare)
-
-1. **GitHub** : crée un repo privé et pousse ce dossier.
-2. **Cloudflare** (une fois) :
+1. **Console Firebase** → *Ajouter un projet* (Analytics inutile).
+2. **Authentication** → *Commencer* → active **Google**.
+3. **Firestore Database** → *Créer* → mode **production**, région `eur3` (Europe).
+4. **Storage** → *Commencer* : demande le forfait **Blaze** (carte bancaire, gratuit sous 5 Go).
+5. **Paramètres du projet** → *Vos applications* → **Web** → copie la config dans `src/firebase-config.ts`.
+6. Dans `firestore.rules` et `storage.rules`, vérifie la liste des adresses autorisées.
+7. Déploie :
    ```bash
-   npx wrangler login
-   npx wrangler d1 create pelote             # copie l'id dans wrangler.toml (database_id)
-   npx wrangler r2 bucket create pelote-panier
-   npm run db:remote                         # crée les tables en production
+   npx firebase login
+   npx firebase use --add        # choisis ton projet
+   npm run deploy                # build + hosting + règles
    ```
-3. **Pages** : Workers & Pages → Create → Pages → *Connect to Git* → ton repo.
-   - Build command : `npm run build`
-   - Output : `dist`
-   - Les liaisons D1 (`DB`) et R2 (`BUCKET`) sont lues depuis `wrangler.toml`.
-4. **Access (la connexion)** : Zero Trust → Access → Applications → *Self-hosted*.
-   - Domaine : `pelote.pages.dev` (ajoute aussi `*.pelote.pages.dev` pour les previews).
-   - Policy : *Allow* → *Emails* → ton adresse.
-   - Copie l'**Application Audience (AUD) Tag** et le domaine de ton équipe (`xxx.cloudflareaccess.com`).
-5. Renseigne `ACCESS_TEAM_DOMAIN` et `ACCESS_AUD` dans `wrangler.toml` (ou dans Pages → Settings → Variables), puis redéploie.
-
-⚠️ Sans l'étape 4–5, l'API refuse toutes les requêtes en production (401) : c'est voulu, rien n'est jamais ouvert par défaut.
+8. **Authentication → Paramètres → Domaines autorisés** : `<projet>.web.app` y est déjà ; ajoute ton domaine perso si tu en utilises un.
 
 ## Raccourcis
 
@@ -71,5 +55,5 @@ En local, l'utilisateur est simulé par `DEV_USER` (fichier `.dev.vars`, jamais 
 
 - **Raccourci global** : dans le navigateur, `⌘⇧9` ne marche que quand Pelote est au premier plan. Le raccourci système demandera l'app Mac (Tauri, même code React).
 - **Partage depuis le téléphone** : le menu « Partager → Pelote » marche sur Android une fois l'app installée. Sur iPhone, Apple ne le permet pas aux web apps : un Raccourci iOS qui ouvre `https://<ton-domaine>/partage?text=…` fait la même chose.
-- **Bilan du soir** : la notification part tant que Pelote est ouvert (onglet ou app installée). Des notifications push serveur (Cron Worker + Web Push) sont la prochaine étape.
+- **Bilan du soir** : la notification part tant que Pelote est ouvert (onglet ou app installée). Des notifications push serveur (Cloud Functions + Firebase Cloud Messaging) sont la prochaine étape.
 - **Confluence** : synchro en lecture seule prévue, pas encore branchée.

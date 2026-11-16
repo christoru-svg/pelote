@@ -8,6 +8,7 @@ import { Icon } from './Icon';
 import { useApp } from '../store';
 import { URL_RE } from '../lib/autotag';
 import { today, ymd } from '../lib/dates';
+import { Login } from '../pages/Login';
 
 const isTyping = (t: EventTarget | null) =>
   t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName));
@@ -25,7 +26,7 @@ function Logo() {
 
 export function Shell() {
   const app = useApp();
-  const { me, fil, latest, statesLoaded, capture, openCapture, etatOpen, setEtatOpen, toast, dismissToast, panierCount, recreEnd, error } = app;
+  const { me, fil, latest, statesLoaded, capture, openCapture, etatOpen, setEtatOpen, toast, dismissToast, panierCount, recreEnd, error, needsLogin } = app;
   const [, tick] = useState(0);
   useEffect(() => { if (!recreEnd) return; const t = setInterval(() => tick((n) => n + 1), 1000); return () => clearInterval(t); }, [recreEnd]);
   const nav = useNavigate();
@@ -109,6 +110,7 @@ export function Shell() {
     else if (q.get('etat')) { nav(loc.pathname, { replace: true }); setEtatOpen(true); }
   }, [loc.pathname, loc.search, nav, openCapture, setEtatOpen]);
 
+  if (needsLogin) return <Login />;
   if (error) {
     return (
       <main className="page" style={{ alignItems: 'center', justifyContent: 'center', minHeight: '100dvh', textAlign: 'center' }}>
