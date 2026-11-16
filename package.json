@@ -1,0 +1,30 @@
+{
+  "name": "pelote",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "test": "vitest run",
+    "db:local": "wrangler d1 migrations apply pelote --local",
+    "db:remote": "wrangler d1 migrations apply pelote --remote",
+    "preview": "npm run build && wrangler pages dev dist --port 8788",
+    "deploy": "npm run build && wrangler pages deploy dist"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-router-dom": "6.28.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "4.20241112.0",
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@vitejs/plugin-react": "4.3.3",
+    "typescript": "5.6.3",
+    "vite": "5.4.11",
+    "vitest": "2.1.5",
+    "wrangler": "3.90.0"
+  }
+}
